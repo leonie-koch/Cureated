@@ -1,4 +1,4 @@
-# Cureated (working title)
+# Cureated
 
 **The smart curator for medical, evidence-based nutrition therapy — driven by science, powered by community.**
 
