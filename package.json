@@ -1,6 +1,6 @@
 {
   "dependencies": {
-    "@nestjs/config": "^4.0.3"
+    "@nestjs/config": "^4.0.4"
   },
   "devDependencies": {
     "@commitlint/cli": "^20.4.2",
