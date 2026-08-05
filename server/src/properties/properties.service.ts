@@ -1,4 +1,8 @@
-import { BadRequestException, Injectable, NotFoundException } from '@nestjs/common';
+import {
+  BadRequestException,
+  Injectable,
+  NotFoundException,
+} from '@nestjs/common';
 import { Prisma } from '@prisma/client';
 import { PrismaService } from '../prisma/prisma.service';
 import { CreatePropertyDto } from './dto/create-property.dto';
@@ -71,7 +75,10 @@ export class PropertiesService {
         include: PROPERTY_INCLUDE,
       });
     } catch (error) {
-      if (error instanceof Prisma.PrismaClientKnownRequestError && error.code === 'P2025') {
+      if (
+        error instanceof Prisma.PrismaClientKnownRequestError &&
+        error.code === 'P2025'
+      ) {
         throw new NotFoundException(`Property with id "${id}" not found`);
       }
       this.throwKnownPrismaError(error);
@@ -85,10 +92,16 @@ export class PropertiesService {
         where: { id },
       });
     } catch (error) {
-      if (error instanceof Prisma.PrismaClientKnownRequestError && error.code === 'P2025') {
+      if (
+        error instanceof Prisma.PrismaClientKnownRequestError &&
+        error.code === 'P2025'
+      ) {
         throw new NotFoundException(`Property with id "${id}" not found`);
       }
-      if (error instanceof Prisma.PrismaClientKnownRequestError && error.code === 'P2003') {
+      if (
+        error instanceof Prisma.PrismaClientKnownRequestError &&
+        error.code === 'P2003'
+      ) {
         throw new BadRequestException(
           'Property is still referenced by condition weights or recipe scores and cannot be deleted.',
         );

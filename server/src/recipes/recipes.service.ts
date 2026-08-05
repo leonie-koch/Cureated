@@ -1,4 +1,8 @@
-import { BadRequestException, Injectable, NotFoundException } from '@nestjs/common';
+import {
+  BadRequestException,
+  Injectable,
+  NotFoundException,
+} from '@nestjs/common';
 import { Prisma } from '@prisma/client';
 import { IngredientsService } from '../ingredients/ingredients.service';
 import { PrismaService } from '../prisma/prisma.service';
@@ -145,14 +149,20 @@ export class RecipesService {
         where: { id },
       });
     } catch (error) {
-      if (error instanceof Prisma.PrismaClientKnownRequestError && error.code === 'P2025') {
+      if (
+        error instanceof Prisma.PrismaClientKnownRequestError &&
+        error.code === 'P2025'
+      ) {
         throw new NotFoundException(`Recipe with id "${id}" not found`);
       }
       throw error;
     }
   }
 
-  private async recomputePropertyScores(tx: Prisma.TransactionClient, recipeId: string) {
+  private async recomputePropertyScores(
+    tx: Prisma.TransactionClient,
+    recipeId: string,
+  ) {
     const recipe = await tx.recipe.findUnique({
       where: { id: recipeId },
       select: {
@@ -185,7 +195,11 @@ export class RecipesService {
     let totalVitaminB12Ug = 0;
 
     for (const item of recipe.recipeIngredients) {
-      const nutrients = await this.ingredientsService.resolveNutrientsForIngredient(tx, item.ingredient);
+      const nutrients =
+        await this.ingredientsService.resolveNutrientsForIngredient(
+          tx,
+          item.ingredient,
+        );
       const grams = this.toGrams(item.amount, item.unit);
       if (!Number.isFinite(grams) || grams <= 0) {
         continue;
@@ -198,8 +212,10 @@ export class RecipesService {
     }
 
     const sugarPer100g = totalMassG > 0 ? (totalSugarG / totalMassG) * 100 : 0;
-    const magnesiumPer100g = totalMassG > 0 ? (totalMagnesiumMg / totalMassG) * 100 : 0;
-    const vitaminB12Per100g = totalMassG > 0 ? (totalVitaminB12Ug / totalMassG) * 100 : 0;
+    const magnesiumPer100g =
+      totalMassG > 0 ? (totalMagnesiumMg / totalMassG) * 100 : 0;
+    const vitaminB12Per100g =
+      totalMassG > 0 ? (totalVitaminB12Ug / totalMassG) * 100 : 0;
 
     const magnesiumScore = this.normalize(magnesiumPer100g, 20, 80);
     const b12Score = this.normalize(vitaminB12Per100g, 0.2, 1.0);
@@ -293,7 +309,9 @@ export class RecipesService {
     }
 
     if (error.code === 'P2002') {
-      throw new BadRequestException('Duplicate recipe ingredients are not allowed.');
+      throw new BadRequestException(
+        'Duplicate recipe ingredients are not allowed.',
+      );
     }
   }
 }
