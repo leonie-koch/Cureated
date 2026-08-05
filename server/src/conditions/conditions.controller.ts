@@ -1,4 +1,14 @@
-import { Body, Controller, Delete, Get, Param, Patch, Post, Put } from '@nestjs/common';
+import {
+  Body,
+  Controller,
+  Delete,
+  Get,
+  Param,
+  Patch,
+  Post,
+  Put,
+  Query,
+} from '@nestjs/common';
 import { ConditionsService } from './conditions.service';
 import { CreateConditionDto } from './dto/create-condition.dto';
 import { SetConditionWeightsDto } from './dto/set-condition-weights.dto';
@@ -24,13 +34,27 @@ export class ConditionsController {
   }
 
   @Patch(':id')
-  update(@Param('id') id: string, @Body() updateConditionDto: UpdateConditionDto) {
+  update(
+    @Param('id') id: string,
+    @Body() updateConditionDto: UpdateConditionDto,
+  ) {
     return this.conditionsService.update(id, updateConditionDto);
   }
 
   @Put(':id/weights')
-  setWeights(@Param('id') id: string, @Body() setConditionWeightsDto: SetConditionWeightsDto) {
+  setWeights(
+    @Param('id') id: string,
+    @Body() setConditionWeightsDto: SetConditionWeightsDto,
+  ) {
     return this.conditionsService.setWeights(id, setConditionWeightsDto);
+  }
+
+  @Get(':id/ranked-recipes')
+  getRankedRecipes(@Param('id') id: string, @Query('limit') limit?: string) {
+    return this.conditionsService.getRankedRecipes(
+      id,
+      limit !== undefined ? Number(limit) : undefined,
+    );
   }
 
   @Delete(':id')
