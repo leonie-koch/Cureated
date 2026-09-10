@@ -46,7 +46,7 @@
     "@nestjs/testing": "^11.0.1",
     "@types/express": "^5.0.0",
     "@types/jest": "^30.0.0",
-    "@types/node": "^22.10.7",
+    "@types/node": "^26.4.1",
     "@types/pg": "^8.23.1",
     "@types/supertest": "^7.2.1",
     "eslint": "^10.10.0",
