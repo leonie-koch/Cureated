@@ -1,4 +1,13 @@
-const API_URL = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:3000";
+import { Button } from "@/components/ui/button";
+import {
+  Card,
+  CardContent,
+  CardDescription,
+  CardHeader,
+  CardTitle,
+} from "@/components/ui/card";
+
+const API_URL = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:3333";
 
 type Recipe = {
   id: string;
@@ -39,45 +48,50 @@ export default async function Home() {
   }
 
   return (
-    <div className="min-h-screen bg-zinc-50 px-6 py-12 dark:bg-black sm:px-12">
+    <div className="min-h-screen bg-background px-6 py-12 sm:px-12">
       <main className="mx-auto flex w-full max-w-4xl flex-col gap-8">
-        <div>
-          <h1 className="text-3xl font-semibold tracking-tight text-black dark:text-zinc-50">
-            Homefeed
-          </h1>
-          <p className="mt-2 text-zinc-600 dark:text-zinc-400">
-            Recipes picked for you.
-          </p>
+        <div className="flex items-start justify-between gap-4">
+          <div>
+            <h1 className="text-3xl font-semibold tracking-tight text-foreground">
+              Homefeed
+            </h1>
+            <p className="mt-2 text-muted-foreground">
+              Recipes picked for you.
+            </p>
+          </div>
+          <Button>Add recipe</Button>
         </div>
 
         {loadError && (
-          <p className="text-sm text-red-600 dark:text-red-400">
-            {loadError}
-          </p>
+          <p className="text-sm text-destructive">{loadError}</p>
         )}
 
         {!loadError && recipes.length === 0 && (
-          <p className="text-sm text-zinc-600 dark:text-zinc-400">
-            No recipes yet.
-          </p>
+          <p className="text-sm text-muted-foreground">No recipes yet.</p>
         )}
 
         <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
           {recipes.map((recipe) => (
-            <div key={recipe.id} className="card bg-base-100 shadow-sm">
-              <div className="card-body">
-                <h2 className="card-title">{recipe.title}</h2>
-                {recipe.description && <p>{recipe.description}</p>}
-                <div className="flex gap-4 text-sm text-zinc-600 dark:text-zinc-400">
-                  {recipe.servings != null && (
-                    <span>{recipe.servings} servings</span>
-                  )}
-                  {totalMinutes(recipe) != null && (
-                    <span>{totalMinutes(recipe)} min</span>
-                  )}
-                </div>
-              </div>
-            </div>
+            <Card key={recipe.id}>
+              <CardHeader>
+                <CardTitle>{recipe.title}</CardTitle>
+                {recipe.description && (
+                  <CardDescription>{recipe.description}</CardDescription>
+                )}
+              </CardHeader>
+              {(recipe.servings != null || totalMinutes(recipe) != null) && (
+                <CardContent>
+                  <div className="flex gap-4 text-sm text-muted-foreground">
+                    {recipe.servings != null && (
+                      <span>{recipe.servings} servings</span>
+                    )}
+                    {totalMinutes(recipe) != null && (
+                      <span>{totalMinutes(recipe)} min</span>
+                    )}
+                  </div>
+                </CardContent>
+              )}
+            </Card>
           ))}
         </div>
       </main>
