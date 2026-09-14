@@ -1,5 +1,5 @@
 export class RecipeIngredientInputDto {
-  ingredientId: string;
+  name: string;
   amount: number;
   unit: string;
 }

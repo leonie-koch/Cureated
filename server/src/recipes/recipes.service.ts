@@ -6,7 +6,10 @@ import {
 import { Prisma } from '@prisma/client';
 import { IngredientsService } from '../ingredients/ingredients.service';
 import { PrismaService } from '../prisma/prisma.service';
-import { CreateRecipeDto } from './dto/create-recipe.dto';
+import {
+  CreateRecipeDto,
+  RecipeIngredientInputDto,
+} from './dto/create-recipe.dto';
 import { UpdateRecipeDto } from './dto/update-recipe.dto';
 
 const RECIPE_INCLUDE = {
@@ -45,12 +48,11 @@ export class RecipesService {
 
         if (dto.ingredients?.length) {
           await tx.recipeIngredient.createMany({
-            data: dto.ingredients.map((ingredient) => ({
-              recipeId: recipe.id,
-              ingredientId: ingredient.ingredientId,
-              amount: ingredient.amount,
-              unit: ingredient.unit,
-            })),
+            data: await this.resolveRecipeIngredientRows(
+              tx,
+              recipe.id,
+              dto.ingredients,
+            ),
           });
         }
 
@@ -120,12 +122,11 @@ export class RecipesService {
 
           if (dto.ingredients.length) {
             await tx.recipeIngredient.createMany({
-              data: dto.ingredients.map((ingredient) => ({
-                recipeId: id,
-                ingredientId: ingredient.ingredientId,
-                amount: ingredient.amount,
-                unit: ingredient.unit,
-              })),
+              data: await this.resolveRecipeIngredientRows(
+                tx,
+                id,
+                dto.ingredients,
+              ),
             });
           }
         }
@@ -157,6 +158,52 @@ export class RecipesService {
       }
       throw error;
     }
+  }
+
+  private async resolveRecipeIngredientRows(
+    tx: Prisma.TransactionClient,
+    recipeId: string,
+    ingredients: RecipeIngredientInputDto[],
+  ): Promise<Prisma.RecipeIngredientCreateManyInput[]> {
+    const rows: Prisma.RecipeIngredientCreateManyInput[] = [];
+
+    for (const ingredient of ingredients) {
+      const ingredientId = await this.resolveIngredientId(
+        tx,
+        ingredient.name,
+      );
+      rows.push({
+        recipeId,
+        ingredientId,
+        amount: ingredient.amount,
+        unit: ingredient.unit,
+      });
+    }
+
+    return rows;
+  }
+
+  private async resolveIngredientId(
+    tx: Prisma.TransactionClient,
+    name: string,
+  ): Promise<string> {
+    const trimmed = name.trim();
+
+    const existing = await tx.ingredient.findFirst({
+      where: { name: { equals: trimmed, mode: 'insensitive' } },
+      select: { id: true },
+    });
+
+    if (existing) {
+      return existing.id;
+    }
+
+    const created = await tx.ingredient.create({
+      data: { name: trimmed },
+      select: { id: true },
+    });
+
+    return created.id;
   }
 
   private async recomputePropertyScores(

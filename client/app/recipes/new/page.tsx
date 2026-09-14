@@ -11,6 +11,7 @@ import {
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
+import { RecipeIngredientsField } from "@/components/recipe-ingredients-field";
 import { cn } from "@/lib/utils";
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:3333";
@@ -21,8 +22,34 @@ function numberOrUndefined(value: FormDataEntryValue | null) {
   return Number.isNaN(parsed) ? undefined : parsed;
 }
 
+type IngredientRow = { name?: string; amount?: string; unit?: string };
+
+function parseIngredients(formData: FormData) {
+  const rows = new Map<string, IngredientRow>();
+
+  for (const [key, value] of formData.entries()) {
+    const match = /^ingredients\.(.+)\.(name|amount|unit)$/.exec(key);
+    if (!match) continue;
+    const [, rowKey, field] = match;
+    const row = rows.get(rowKey) ?? {};
+    row[field as keyof IngredientRow] = String(value);
+    rows.set(rowKey, row);
+  }
+
+  return Array.from(rows.values())
+    .filter((row) => row.name?.trim())
+    .map((row) => ({
+      name: row.name!.trim(),
+      amount: Number(row.amount),
+      unit: row.unit ?? "g",
+    }))
+    .filter((row) => Number.isFinite(row.amount) && row.amount > 0);
+}
+
 async function createRecipe(formData: FormData) {
   "use server";
+
+  const ingredients = parseIngredients(formData);
 
   const payload = {
     title: String(formData.get("title") ?? ""),
@@ -31,6 +58,7 @@ async function createRecipe(formData: FormData) {
     prepMinutes: numberOrUndefined(formData.get("prepMinutes")),
     cookMinutes: numberOrUndefined(formData.get("cookMinutes")),
     instructions: (formData.get("instructions") as string) || undefined,
+    ingredients: ingredients.length ? ingredients : undefined,
   };
 
   const res = await fetch(`${API_URL}/recipes`, {
@@ -105,6 +133,8 @@ export default function NewRecipePage() {
                   />
                 </div>
               </div>
+
+              <RecipeIngredientsField />
 
               <div className="flex flex-col gap-1.5">
                 <Label htmlFor="instructions">Instructions</Label>

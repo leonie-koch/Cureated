@@ -21,6 +21,20 @@ test("adds a recipe via the create-recipe form and shows it in the homefeed", as
   await page.getByLabel("Cook (min)").fill("10");
   await page.getByLabel("Instructions").fill("Mix everything and serve.");
 
+  const nameInputs = page.getByPlaceholder("e.g. Salmon fillet");
+  const amountInputs = page.getByPlaceholder("Amount");
+
+  // First ingredient row, keep the default "g" unit.
+  await nameInputs.nth(0).fill("Salmon");
+  await amountInputs.nth(0).fill("200");
+
+  // Second ingredient row, switch the unit away from the default.
+  await page.getByRole("button", { name: "+ Add ingredient" }).click();
+  await nameInputs.nth(1).fill("Spinach");
+  await amountInputs.nth(1).fill("1");
+  await page.getByRole("combobox", { name: "Unit" }).nth(1).click();
+  await page.getByRole("option", { name: "cup" }).click();
+
   await page.getByRole("button", { name: "Save recipe" }).click();
 
   await expect(page).toHaveURL("/");
@@ -33,6 +47,19 @@ test("adds a recipe via the create-recipe form and shows it in the homefeed", as
     recipe.title === title
   );
   expect(created).toBeTruthy();
+
+  const ingredientNames = created.recipeIngredients.map(
+    (ri: { ingredient: { name: string } }) => ri.ingredient.name,
+  );
+  expect(ingredientNames).toEqual(
+    expect.arrayContaining(["Salmon", "Spinach"]),
+  );
+  const spinach = created.recipeIngredients.find(
+    (ri: { ingredient: { name: string } }) =>
+      ri.ingredient.name === "Spinach",
+  );
+  expect(spinach.unit).toBe("cup");
+  expect(spinach.amount).toBe(1);
 
   await request.delete(`${API_URL}/recipes/${created.id}`);
 });
