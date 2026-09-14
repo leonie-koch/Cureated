@@ -1,4 +1,5 @@
-import { Button } from "@/components/ui/button";
+import Link from "next/link";
+import { buttonVariants } from "@/components/ui/button";
 import {
   Card,
   CardContent,
@@ -6,6 +7,7 @@ import {
   CardHeader,
   CardTitle,
 } from "@/components/ui/card";
+import { cn } from "@/lib/utils";
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:3333";
 
@@ -59,7 +61,9 @@ export default async function Home() {
               Recipes picked for you.
             </p>
           </div>
-          <Button>Add recipe</Button>
+          <Link href="/recipes/new" className={cn(buttonVariants())}>
+            Add recipe
+          </Link>
         </div>
 
         {loadError && (
