@@ -9,10 +9,10 @@ import {
   Put,
   Query,
 } from '@nestjs/common';
-import { ConditionsService } from './conditions.service';
-import { CreateConditionDto } from './dto/create-condition.dto';
-import { SetConditionWeightsDto } from './dto/set-condition-weights.dto';
-import { UpdateConditionDto } from './dto/update-condition.dto';
+import { ConditionsService } from './conditions.service.js';
+import { CreateConditionDto } from './dto/create-condition.dto.js';
+import { SetConditionWeightsDto } from './dto/set-condition-weights.dto.js';
+import { UpdateConditionDto } from './dto/update-condition.dto.js';
 
 @Controller('conditions')
 export class ConditionsController {

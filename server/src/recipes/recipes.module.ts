@@ -1,7 +1,7 @@
 import { Module } from '@nestjs/common';
-import { IngredientsModule } from '../ingredients/ingredients.module';
-import { RecipesController } from './recipes.controller';
-import { RecipesService } from './recipes.service';
+import { IngredientsModule } from '../ingredients/ingredients.module.js';
+import { RecipesController } from './recipes.controller.js';
+import { RecipesService } from './recipes.service.js';
 
 @Module({
   imports: [IngredientsModule],

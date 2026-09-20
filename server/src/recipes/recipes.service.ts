@@ -4,13 +4,13 @@ import {
   NotFoundException,
 } from '@nestjs/common';
 import { Prisma } from '@prisma/client';
-import { IngredientsService } from '../ingredients/ingredients.service';
-import { PrismaService } from '../prisma/prisma.service';
+import { IngredientsService } from '../ingredients/ingredients.service.js';
+import { PrismaService } from '../prisma/prisma.service.js';
 import {
   CreateRecipeDto,
   RecipeIngredientInputDto,
-} from './dto/create-recipe.dto';
-import { UpdateRecipeDto } from './dto/update-recipe.dto';
+} from './dto/create-recipe.dto.js';
+import { UpdateRecipeDto } from './dto/update-recipe.dto.js';
 
 const RECIPE_INCLUDE = {
   recipeIngredients: {
