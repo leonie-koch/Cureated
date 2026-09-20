@@ -168,7 +168,7 @@ export class RecipesService {
     const rows: Prisma.RecipeIngredientCreateManyInput[] = [];
 
     for (const ingredient of ingredients) {
-      const ingredientId = await this.resolveIngredientId(tx, ingredient.name);
+      const ingredientId = await this.resolveIngredientId(tx, ingredient);
       rows.push({
         recipeId,
         ingredientId,
@@ -182,15 +182,23 @@ export class RecipesService {
 
   private async resolveIngredientId(
     tx: Prisma.TransactionClient,
-    name: string,
+    input: Pick<RecipeIngredientInputDto, 'name' | 'blsFoodCode'>,
   ): Promise<string> {
-    const trimmed = name.trim();
+    if (input.blsFoodCode) {
+      return this.resolveIngredientIdByBlsFoodCode(tx, input.blsFoodCode);
+    }
 
+    if (!input.name?.trim()) {
+      throw new BadRequestException(
+        'Each ingredient needs a name or a blsFoodCode.',
+      );
+    }
+
+    const trimmed = input.name.trim();
     const existing = await tx.ingredient.findFirst({
       where: { name: { equals: trimmed, mode: 'insensitive' } },
       select: { id: true },
     });
-
     if (existing) {
       return existing.id;
     }
@@ -199,7 +207,51 @@ export class RecipesService {
       data: { name: trimmed },
       select: { id: true },
     });
+    return created.id;
+  }
 
+  private async resolveIngredientIdByBlsFoodCode(
+    tx: Prisma.TransactionClient,
+    blsFoodCode: string,
+  ): Promise<string> {
+    const alreadyMatched = await tx.ingredient.findFirst({
+      where: { blsFoodCode },
+      select: { id: true },
+    });
+    if (alreadyMatched) {
+      return alreadyMatched.id;
+    }
+
+    const blsFood = await tx.blsFood.findUnique({
+      where: { blsCode: blsFoodCode },
+      select: { nameDe: true },
+    });
+    if (!blsFood) {
+      throw new NotFoundException(
+        `BLS food with code "${blsFoodCode}" not found`,
+      );
+    }
+
+    // An ingredient with this name may already exist from free-text entry
+    // before this ingredient list existed — match it retroactively instead
+    // of creating a duplicate that collides on the unique name.
+    const existingByName = await tx.ingredient.findFirst({
+      where: { name: { equals: blsFood.nameDe, mode: 'insensitive' } },
+      select: { id: true },
+    });
+    if (existingByName) {
+      const updated = await tx.ingredient.update({
+        where: { id: existingByName.id },
+        data: { blsFoodCode },
+        select: { id: true },
+      });
+      return updated.id;
+    }
+
+    const created = await tx.ingredient.create({
+      data: { name: blsFood.nameDe, blsFoodCode },
+      select: { id: true },
+    });
     return created.id;
   }
 

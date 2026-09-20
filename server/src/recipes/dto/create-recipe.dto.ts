@@ -1,5 +1,6 @@
 export class RecipeIngredientInputDto {
-  name: string;
+  name?: string;
+  blsFoodCode?: string;
   amount: number;
   unit: string;
 }
