@@ -13,17 +13,17 @@ datasource db {
 }
 
 model Recipe {
-  id                 String                @id @default(cuid())
-  title              String
-  description        String?
-  servings           Int?
-  prepMinutes        Int?
-  cookMinutes        Int?
-  instructions       String?
-  createdAt          DateTime              @default(now())
-  updatedAt          DateTime              @updatedAt
-  recipeIngredients  RecipeIngredient[]
-  propertyScores     RecipePropertyScore[]
+  id                String                @id @default(cuid())
+  title             String
+  description       String?
+  servings          Int?
+  prepMinutes       Int?
+  cookMinutes       Int?
+  instructions      String?
+  createdAt         DateTime              @default(now())
+  updatedAt         DateTime              @updatedAt
+  recipeIngredients RecipeIngredient[]
+  propertyScores    RecipePropertyScore[]
 }
 
 model Ingredient {
@@ -54,14 +54,14 @@ model RecipeIngredient {
 }
 
 model Property {
-  id                String                    @id @default(cuid())
-  key               String                    @unique
-  label             String
-  description       String?
-  createdAt         DateTime                  @default(now())
-  updatedAt         DateTime                  @updatedAt
-  recipeScores      RecipePropertyScore[]
-  conditionWeights  ConditionPropertyWeight[]
+  id               String                    @id @default(cuid())
+  key              String                    @unique
+  label            String
+  description      String?
+  createdAt        DateTime                  @default(now())
+  updatedAt        DateTime                  @updatedAt
+  recipeScores     RecipePropertyScore[]
+  conditionWeights ConditionPropertyWeight[]
 }
 
 model RecipePropertyScore {
@@ -76,6 +76,58 @@ model RecipePropertyScore {
 
   @@unique([recipeId, propertyId])
   @@index([propertyId, score])
+}
+
+// Bundeslebensmittelschlüssel (BLS) 4.0 reference data, imported from the
+// official BLS data package (see README "Data sources"). BlsFood and
+// BlsNutrientComponent use the BLS-assigned codes as primary keys (rather
+// than a generated cuid, unlike the app's own models above) since they're
+// stable external identifiers and importing ~870k BlsFoodNutrient rows is
+// simpler and faster when it can reference codes directly instead of
+// resolving generated ids first.
+model BlsFood {
+  blsCode   String            @id
+  nameDe    String
+  nameEn    String?
+  createdAt DateTime          @default(now())
+  updatedAt DateTime          @updatedAt
+  nutrients BlsFoodNutrient[]
+
+  @@index([nameDe])
+}
+
+model BlsNutrientComponent {
+  code        String            @id
+  nameDe      String
+  nameEn      String?
+  unit        String
+  group       String?
+  groupEn     String?
+  formula     String?
+  formulaNote String?
+  createdAt   DateTime          @default(now())
+  updatedAt   DateTime          @updatedAt
+  values      BlsFoodNutrient[]
+}
+
+// One row per (food, nutrient) pair instead of one wide row per food.
+// A pair with no data at all in the source ("-") is simply not imported
+// as a row here; `value` is null only for a pair that has a qualifier
+// (e.g. "TR" for trace, below the detection/quantification limit) but no
+// exact number.
+model BlsFoodNutrient {
+  foodCode      String
+  componentCode String
+  value         Float?
+  qualifier     String?
+  source        String?
+  reference     String?
+  createdAt     DateTime             @default(now())
+  food          BlsFood              @relation(fields: [foodCode], references: [blsCode], onDelete: Cascade)
+  component     BlsNutrientComponent @relation(fields: [componentCode], references: [code], onDelete: Restrict)
+
+  @@id([foodCode, componentCode])
+  @@index([componentCode])
 }
 
 model Condition {
