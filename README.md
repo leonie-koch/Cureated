@@ -62,6 +62,17 @@ npm install
 npm run dev
 ```
 
+## Data sources
+
+Micronutrient data is sourced from the **Bundeslebensmittelschlüssel (BLS)**, Germany's national nutrient database, published by the Max Rubner-Institut, licensed under [CC BY 4.0](https://creativecommons.org/licenses/by/4.0/).
+
+Citation: Max Rubner-Institut (2025): Bundeslebensmittelschlüssel (BLS), Version 4.0 — Deutsche Nährstoffdatenbank. Karlsruhe. DOI: [10.25826/Data20251217-134202-0](https://doi.org/10.25826/Data20251217-134202-0)
+
+The raw BLS data files (`BLS_4_0_Daten_2025_DE.xlsx`, `BLS_4_0_Components_DE_EN.xlsx`) are not checked into this repository (they're large and versioned upstream, not by us). To (re-)seed the local database:
+
+1. Download the current BLS 4.0 package from [blsdb.de](https://www.blsdb.de/) and unpack it into `BLS_4_0_2025_DE/` at the repo root (already gitignored).
+2. Run the import script (see `server/prisma/import-bls.ts`).
+
 ## Status
 
 Early-stage prototype of a personal side project — currently in active development.

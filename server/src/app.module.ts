@@ -2,6 +2,7 @@ import { Module } from '@nestjs/common';
 import { ConfigModule } from '@nestjs/config';
 import { AppController } from './app.controller.js';
 import { AppService } from './app.service.js';
+import { BlsFoodsModule } from './bls-foods/bls-foods.module.js';
 import { ConditionsModule } from './conditions/conditions.module.js';
 import { IngredientsModule } from './ingredients/ingredients.module.js';
 import { PrismaModule } from './prisma/prisma.module.js';
@@ -16,6 +17,7 @@ import { RecipesModule } from './recipes/recipes.module.js';
     IngredientsModule,
     ConditionsModule,
     PropertiesModule,
+    BlsFoodsModule,
   ],
   controllers: [AppController],
   providers: [AppService],

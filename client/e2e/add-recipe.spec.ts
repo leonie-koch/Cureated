@@ -21,16 +21,19 @@ test("adds a recipe via the create-recipe form and shows it in the homefeed", as
   await page.getByLabel("Cook (min)").fill("10");
   await page.getByLabel("Instructions").fill("Mix everything and serve.");
 
-  const nameInputs = page.getByPlaceholder("e.g. Salmon fillet");
+  const ingredientInputs = page.getByLabel("Ingredient", { exact: true });
   const amountInputs = page.getByPlaceholder("Amount");
 
-  // First ingredient row, keep the default "g" unit.
-  await nameInputs.nth(0).fill("Salmon");
+  // Ingredients can only be added by picking a result from the dropdown —
+  // typing alone never adds one, matching real BLS food names.
+  await ingredientInputs.nth(0).fill("Tomate roh");
+  await page.getByRole("option", { name: "Tomate roh" }).click();
   await amountInputs.nth(0).fill("200");
 
   // Second ingredient row, switch the unit away from the default.
   await page.getByRole("button", { name: "+ Add ingredient" }).click();
-  await nameInputs.nth(1).fill("Spinach");
+  await ingredientInputs.nth(1).fill("Hühnerei roh");
+  await page.getByRole("option", { name: "Hühnerei roh" }).click();
   await amountInputs.nth(1).fill("1");
   await page.getByRole("combobox", { name: "Unit" }).nth(1).click();
   await page.getByRole("option", { name: "cup" }).click();
@@ -52,14 +55,21 @@ test("adds a recipe via the create-recipe form and shows it in the homefeed", as
     (ri: { ingredient: { name: string } }) => ri.ingredient.name,
   );
   expect(ingredientNames).toEqual(
-    expect.arrayContaining(["Salmon", "Spinach"]),
+    expect.arrayContaining(["Tomate roh", "Hühnerei roh"]),
   );
-  const spinach = created.recipeIngredients.find(
+  const egg = created.recipeIngredients.find(
     (ri: { ingredient: { name: string } }) =>
-      ri.ingredient.name === "Spinach",
+      ri.ingredient.name === "Hühnerei roh",
   );
-  expect(spinach.unit).toBe("cup");
-  expect(spinach.amount).toBe(1);
+  expect(egg.unit).toBe("cup");
+  expect(egg.amount).toBe(1);
+  expect(egg.ingredient.blsFoodCode).toBe("E111100");
+
+  const tomato = created.recipeIngredients.find(
+    (ri: { ingredient: { name: string } }) =>
+      ri.ingredient.name === "Tomate roh",
+  );
+  expect(tomato.ingredient.blsFoodCode).toBe("G561100");
 
   await request.delete(`${API_URL}/recipes/${created.id}`);
 });

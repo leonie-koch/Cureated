@@ -3,3 +3,7 @@ dist/
 .env
 .DS_Store
 .idea/
+
+# BLS nutrient database source files (large, downloaded separately — see README)
+/BLS_4_0_2025_DE/
+/BLS_4_0_2025_DE.zip

@@ -22,13 +22,13 @@ function numberOrUndefined(value: FormDataEntryValue | null) {
   return Number.isNaN(parsed) ? undefined : parsed;
 }
 
-type IngredientRow = { name?: string; amount?: string; unit?: string };
+type IngredientRow = { blsFoodCode?: string; amount?: string; unit?: string };
 
 function parseIngredients(formData: FormData) {
   const rows = new Map<string, IngredientRow>();
 
   for (const [key, value] of formData.entries()) {
-    const match = /^ingredients\.(.+)\.(name|amount|unit)$/.exec(key);
+    const match = /^ingredients\.(.+)\.(blsFoodCode|amount|unit)$/.exec(key);
     if (!match) continue;
     const [, rowKey, field] = match;
     const row = rows.get(rowKey) ?? {};
@@ -36,10 +36,12 @@ function parseIngredients(formData: FormData) {
     rows.set(rowKey, row);
   }
 
+  // A row with no blsFoodCode means the user typed a query without picking
+  // anything from the dropdown — dropped rather than added as free text.
   return Array.from(rows.values())
-    .filter((row) => row.name?.trim())
+    .filter((row) => row.blsFoodCode?.trim())
     .map((row) => ({
-      name: row.name!.trim(),
+      blsFoodCode: row.blsFoodCode!.trim(),
       amount: Number(row.amount),
       unit: row.unit ?? "g",
     }))
