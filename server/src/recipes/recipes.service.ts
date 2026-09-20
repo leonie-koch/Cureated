@@ -168,10 +168,7 @@ export class RecipesService {
     const rows: Prisma.RecipeIngredientCreateManyInput[] = [];
 
     for (const ingredient of ingredients) {
-      const ingredientId = await this.resolveIngredientId(
-        tx,
-        ingredient.name,
-      );
+      const ingredientId = await this.resolveIngredientId(tx, ingredient.name);
       rows.push({
         recipeId,
         ingredientId,
@@ -219,12 +216,8 @@ export class RecipesService {
             unit: true,
             ingredient: {
               select: {
-                id: true,
                 name: true,
-                kcalPer100g: true,
-                sugarPer100g: true,
-                magnesiumPer100gMg: true,
-                vitaminB12Per100g: true,
+                blsFoodCode: true,
               },
             },
           },
@@ -244,7 +237,6 @@ export class RecipesService {
     for (const item of recipe.recipeIngredients) {
       const nutrients =
         await this.ingredientsService.resolveNutrientsForIngredient(
-          tx,
           item.ingredient,
         );
       const grams = this.toGrams(item.amount, item.unit);

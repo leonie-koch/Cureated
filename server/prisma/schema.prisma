@@ -27,16 +27,19 @@ model Recipe {
 }
 
 model Ingredient {
-  id                 String             @id @default(cuid())
-  name               String             @unique
-  defaultUnit        String?
-  kcalPer100g        Float?
-  sugarPer100g       Float?
-  magnesiumPer100gMg Float?
-  vitaminB12Per100g  Float?
-  createdAt          DateTime           @default(now())
-  updatedAt          DateTime           @updatedAt
-  recipeIngredients  RecipeIngredient[]
+  id                String             @id @default(cuid())
+  name              String             @unique
+  defaultUnit       String?
+  // Set once, manually confirmed by a user matching this ingredient against
+  // BLS search results — never auto-matched. All nutrient data lives on the
+  // matched BlsFood/BlsFoodNutrient rows, not duplicated here.
+  blsFoodCode       String?
+  blsFood           BlsFood?           @relation(fields: [blsFoodCode], references: [blsCode])
+  createdAt         DateTime           @default(now())
+  updatedAt         DateTime           @updatedAt
+  recipeIngredients RecipeIngredient[]
+
+  @@index([blsFoodCode])
 }
 
 model RecipeIngredient {
@@ -86,12 +89,17 @@ model RecipePropertyScore {
 // simpler and faster when it can reference codes directly instead of
 // resolving generated ids first.
 model BlsFood {
-  blsCode   String            @id
-  nameDe    String
-  nameEn    String?
-  createdAt DateTime          @default(now())
-  updatedAt DateTime          @updatedAt
-  nutrients BlsFoodNutrient[]
+  blsCode     String            @id
+  nameDe      String
+  nameEn      String?
+  // Derived from the BLS code's leading letter at import time, using the
+  // category browser at blsdb.de (the BLS documentation itself doesn't
+  // publish this mapping) — see FOOD_GROUP_BY_LETTER in import-bls.ts.
+  foodGroup   String?
+  createdAt   DateTime          @default(now())
+  updatedAt   DateTime          @updatedAt
+  nutrients   BlsFoodNutrient[]
+  ingredients Ingredient[]
 
   @@index([nameDe])
 }

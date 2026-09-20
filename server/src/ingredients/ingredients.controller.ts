@@ -8,6 +8,7 @@ import {
   Post,
 } from '@nestjs/common';
 import { CreateIngredientDto } from './dto/create-ingredient.dto.js';
+import { MatchBlsFoodDto } from './dto/match-bls-food.dto.js';
 import { UpdateIngredientDto } from './dto/update-ingredient.dto.js';
 import { IngredientsService } from './ingredients.service.js';
 
@@ -41,5 +42,13 @@ export class IngredientsController {
   @Delete(':id')
   remove(@Param('id') id: string) {
     return this.ingredientsService.remove(id);
+  }
+
+  @Patch(':id/bls-match')
+  matchToBlsFood(
+    @Param('id') id: string,
+    @Body() matchBlsFoodDto: MatchBlsFoodDto,
+  ) {
+    return this.ingredientsService.matchToBlsFood(id, matchBlsFoodDto);
   }
 }

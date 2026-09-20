@@ -21,6 +21,34 @@ const dataFile = path.join(dataDir, 'BLS_4_0_Daten_2025_DE.xlsx');
 // Cells that mean "no data given" throughout the BLS files.
 const NO_DATA_MARKERS = new Set(['-', '']);
 
+// The BLS documentation only gives one example of the code-prefix scheme
+// (C = Getreide) and doesn't publish the full table. This mapping is taken
+// from the category browser at
+// https://blsdb.de/search?catId=top&type=category instead, since that's
+// the only place the complete, official grouping is shown.
+const FOOD_GROUP_BY_LETTER: Record<string, string> = {
+  B: 'Brot und Kleingebäck',
+  C: 'Cerealien, Getreide, Getreideprodukte, Reis- und Haferdrinks',
+  D: 'Dauerbackwaren, Kuchen, Feinbackwaren',
+  E: 'Eier und Eierprodukte, Teigwaren',
+  F: 'Früchte, Obst und Obsterzeugnisse',
+  G: 'Gemüse und Gemüseerzeugnisse',
+  H: 'Hülsenfrüchte, Schalenobst, Öl- und andere Samen, pflanzliche Alternativen',
+  K: 'Kartoffeln und Kartoffelerzeugnisse, stärkereiche Pflanzenteile, Pilze',
+  M: 'Milch, Milcherzeugnisse, Käse',
+  N: 'Alkoholfreie Getränke',
+  P: 'Alkoholische Getränke',
+  Q: 'Speisefette und Öle',
+  R: 'Würzmittel, Saucen, Back- und Kochzutaten',
+  S: 'Süßwaren, Zucker, Schokolade, Eis und süße Aufstriche',
+  T: 'Fische, Krusten-, Schalen- und Weichtiere',
+  U: 'Rind-, Kalb-, Schweine-, Schaf- und Lammfleisch',
+  V: 'Wild, Geflügel, Federwild, Innereien',
+  W: 'Fleisch- und Wurstwaren',
+  X: 'Menükomponenten überwiegend pflanzlich',
+  Y: 'Menükomponenten überwiegend tierisch',
+};
+
 interface ComponentRow {
   code: string;
   nameDe: string;
@@ -36,6 +64,7 @@ interface FoodRow {
   blsCode: string;
   nameDe: string;
   nameEn: string | null;
+  foodGroup: string | null;
 }
 
 interface FoodNutrientRow {
@@ -125,16 +154,22 @@ async function readFoodData(
   const foods: FoodRow[] = [];
   const foodNutrients: FoodNutrientRow[] = [];
   let skippedNoData = 0;
+  const unknownGroupLetters = new Set<string>();
 
   sheet.eachRow((row, rowNumber) => {
     if (rowNumber === 1) return;
     const blsCode = cellText(row.getCell(1).value);
     if (!blsCode) return;
 
+    const letter = blsCode[0];
+    const foodGroup = FOOD_GROUP_BY_LETTER[letter] ?? null;
+    if (!foodGroup) unknownGroupLetters.add(letter);
+
     foods.push({
       blsCode,
       nameDe: cellText(row.getCell(2).value) ?? blsCode,
       nameEn: cellText(row.getCell(3).value),
+      foodGroup,
     });
 
     for (const { code, valueCol } of nutrientColumns) {
@@ -159,6 +194,13 @@ async function readFoodData(
     }
   });
 
+  if (unknownGroupLetters.size > 0) {
+    console.warn(
+      `  Warning: no food group known for BLS code letter(s): ${[...unknownGroupLetters].join(', ')}. ` +
+        'Those foods will have foodGroup = null.',
+    );
+  }
+
   return { foods, foodNutrients, skippedNoData };
 }
 
@@ -181,18 +223,39 @@ async function main() {
       `${withQualifier} with a qualifier instead of a number.`,
   );
 
-  console.log('Replacing existing BLS data in the database...');
+  console.log('Writing BLS data to the database...');
   await prisma.$transaction(
     async (tx) => {
-      await tx.blsFoodNutrient.deleteMany();
-      await tx.blsFood.deleteMany();
-      await tx.blsNutrientComponent.deleteMany();
-
-      await tx.blsNutrientComponent.createMany({ data: components });
-      for (const batch of chunk(foods, 2000)) {
-        await tx.blsFood.createMany({ data: batch });
+      // BlsFood/BlsNutrientComponent are upserted, never deleted: an
+      // Ingredient can reference a BlsFood by its code, so dropping and
+      // recreating these rows on every re-import would either violate that
+      // foreign key or silently wipe out existing ingredient-to-BLS-food
+      // matches. Nothing references BlsFoodNutrient rows directly, so those
+      // are safe to fully replace.
+      console.log(`  Upserting ${components.length} nutrient components...`);
+      for (const component of components) {
+        await tx.blsNutrientComponent.upsert({
+          where: { code: component.code },
+          create: component,
+          update: component,
+        });
       }
 
+      console.log(`  Upserting ${foods.length} foods...`);
+      let upserted = 0;
+      for (const food of foods) {
+        await tx.blsFood.upsert({
+          where: { blsCode: food.blsCode },
+          create: food,
+          update: food,
+        });
+        upserted++;
+        if (upserted % 1000 === 0) {
+          console.log(`  ${upserted}/${foods.length} foods...`);
+        }
+      }
+
+      await tx.blsFoodNutrient.deleteMany();
       let inserted = 0;
       for (const batch of chunk(foodNutrients, 5000)) {
         await tx.blsFoodNutrient.createMany({ data: batch });
@@ -200,7 +263,7 @@ async function main() {
         console.log(`  ${inserted}/${foodNutrients.length} nutrient values...`);
       }
     },
-    { timeout: 10 * 60 * 1000, maxWait: 30 * 1000 },
+    { timeout: 15 * 60 * 1000, maxWait: 30 * 1000 },
   );
 
   console.log('Done.');
