@@ -25,7 +25,8 @@
     "prisma:generate": "prisma generate",
     "prisma:migrate:dev": "prisma migrate dev",
     "prisma:seed": "node --loader ts-node/esm --no-warnings prisma/seed.ts",
-    "prisma:studio": "prisma studio"
+    "prisma:studio": "prisma studio",
+    "bls:import": "node --loader ts-node/esm --no-warnings prisma/import-bls.ts"
   },
   "dependencies": {
     "@nestjs/common": "^12.0.3",
@@ -53,6 +54,7 @@
     "eslint": "^10.10.0",
     "eslint-config-prettier": "^10.0.1",
     "eslint-plugin-prettier": "^5.2.2",
+    "exceljs": "^4.4.0",
     "globals": "^17.9.0",
     "jest": "^30.5.1",
     "prettier": "^3.4.2",
