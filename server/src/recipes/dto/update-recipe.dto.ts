@@ -1,4 +1,4 @@
-import { RecipeIngredientInputDto } from './create-recipe.dto';
+import { RecipeIngredientInputDto } from './create-recipe.dto.js';
 
 export class UpdateRecipeDto {
   title?: string;

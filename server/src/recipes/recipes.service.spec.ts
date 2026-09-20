@@ -1,4 +1,4 @@
-import { RecipesService } from './recipes.service';
+import { RecipesService } from './recipes.service.js';
 
 type PrivateMethods = {
   toGrams(amount: number, unit: string): number;

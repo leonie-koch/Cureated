@@ -4,9 +4,9 @@ import {
   NotFoundException,
 } from '@nestjs/common';
 import { Prisma } from '@prisma/client';
-import { PrismaService } from '../prisma/prisma.service';
-import { CreatePropertyDto } from './dto/create-property.dto';
-import { UpdatePropertyDto } from './dto/update-property.dto';
+import { PrismaService } from '../prisma/prisma.service.js';
+import { CreatePropertyDto } from './dto/create-property.dto.js';
+import { UpdatePropertyDto } from './dto/update-property.dto.js';
 
 const PROPERTY_INCLUDE = {
   conditionWeights: {

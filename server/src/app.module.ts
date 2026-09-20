@@ -1,12 +1,12 @@
 import { Module } from '@nestjs/common';
 import { ConfigModule } from '@nestjs/config';
-import { AppController } from './app.controller';
-import { AppService } from './app.service';
-import { ConditionsModule } from './conditions/conditions.module';
-import { IngredientsModule } from './ingredients/ingredients.module';
-import { PrismaModule } from './prisma/prisma.module';
-import { PropertiesModule } from './properties/properties.module';
-import { RecipesModule } from './recipes/recipes.module';
+import { AppController } from './app.controller.js';
+import { AppService } from './app.service.js';
+import { ConditionsModule } from './conditions/conditions.module.js';
+import { IngredientsModule } from './ingredients/ingredients.module.js';
+import { PrismaModule } from './prisma/prisma.module.js';
+import { PropertiesModule } from './properties/properties.module.js';
+import { RecipesModule } from './recipes/recipes.module.js';
 
 @Module({
   imports: [

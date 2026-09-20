@@ -1,6 +1,6 @@
 import { Module } from '@nestjs/common';
-import { ConditionsController } from './conditions.controller';
-import { ConditionsService } from './conditions.service';
+import { ConditionsController } from './conditions.controller.js';
+import { ConditionsService } from './conditions.service.js';
 
 @Module({
   controllers: [ConditionsController],

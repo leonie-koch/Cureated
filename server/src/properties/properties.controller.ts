@@ -7,9 +7,9 @@ import {
   Patch,
   Post,
 } from '@nestjs/common';
-import { CreatePropertyDto } from './dto/create-property.dto';
-import { UpdatePropertyDto } from './dto/update-property.dto';
-import { PropertiesService } from './properties.service';
+import { CreatePropertyDto } from './dto/create-property.dto.js';
+import { UpdatePropertyDto } from './dto/update-property.dto.js';
+import { PropertiesService } from './properties.service.js';
 
 @Controller('properties')
 export class PropertiesController {

@@ -7,9 +7,9 @@ import {
   Patch,
   Post,
 } from '@nestjs/common';
-import { CreateRecipeDto } from './dto/create-recipe.dto';
-import { UpdateRecipeDto } from './dto/update-recipe.dto';
-import { RecipesService } from './recipes.service';
+import { CreateRecipeDto } from './dto/create-recipe.dto.js';
+import { UpdateRecipeDto } from './dto/update-recipe.dto.js';
+import { RecipesService } from './recipes.service.js';
 
 @Controller('recipes')
 export class RecipesController {

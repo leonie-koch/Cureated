@@ -4,9 +4,9 @@ import {
   NotFoundException,
 } from '@nestjs/common';
 import { Prisma } from '@prisma/client';
-import { PrismaService } from '../prisma/prisma.service';
-import { CreateIngredientDto } from './dto/create-ingredient.dto';
-import { UpdateIngredientDto } from './dto/update-ingredient.dto';
+import { PrismaService } from '../prisma/prisma.service.js';
+import { CreateIngredientDto } from './dto/create-ingredient.dto.js';
+import { UpdateIngredientDto } from './dto/update-ingredient.dto.js';
 
 type NutrientProfile = {
   kcalPer100g: number;

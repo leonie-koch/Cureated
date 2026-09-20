@@ -4,10 +4,10 @@ import {
   NotFoundException,
 } from '@nestjs/common';
 import { Prisma } from '@prisma/client';
-import { PrismaService } from '../prisma/prisma.service';
-import { CreateConditionDto } from './dto/create-condition.dto';
-import { SetConditionWeightsDto } from './dto/set-condition-weights.dto';
-import { UpdateConditionDto } from './dto/update-condition.dto';
+import { PrismaService } from '../prisma/prisma.service.js';
+import { CreateConditionDto } from './dto/create-condition.dto.js';
+import { SetConditionWeightsDto } from './dto/set-condition-weights.dto.js';
+import { UpdateConditionDto } from './dto/update-condition.dto.js';
 
 const CONDITION_INCLUDE = {
   weights: {
