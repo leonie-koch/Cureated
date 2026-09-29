@@ -9,6 +9,7 @@ import {
 } from "@/components/ui/card";
 import { cn } from "@/lib/utils";
 import { API_URL } from "@/lib/api";
+import { PropertyScore, qualifyingPropertyScores } from "@/lib/property-scores";
 
 type Recipe = {
   id: string;
@@ -17,6 +18,7 @@ type Recipe = {
   servings: number | null;
   prepMinutes: number | null;
   cookMinutes: number | null;
+  propertyScores: PropertyScore[];
 };
 
 async function getRecipes(): Promise<Recipe[]> {
@@ -74,30 +76,57 @@ export default async function Home() {
         )}
 
         <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
-          {recipes.map((recipe) => (
-            <Link key={recipe.id} href={`/recipes/${recipe.id}`}>
-              <Card className="transition-shadow hover:shadow-md">
-                <CardHeader>
-                  <CardTitle>{recipe.title}</CardTitle>
-                  {recipe.description && (
-                    <CardDescription>{recipe.description}</CardDescription>
+          {recipes.map((recipe) => {
+            const qualifying = qualifyingPropertyScores(
+              recipe.propertyScores,
+            );
+
+            return (
+              <Link key={recipe.id} href={`/recipes/${recipe.id}`}>
+                <Card className="transition-shadow hover:shadow-md">
+                  <CardHeader>
+                    <CardTitle>{recipe.title}</CardTitle>
+                    {recipe.description && (
+                      <CardDescription>{recipe.description}</CardDescription>
+                    )}
+                  </CardHeader>
+                  {(recipe.servings != null ||
+                    totalMinutes(recipe) != null ||
+                    qualifying.length > 0) && (
+                    <CardContent className="flex flex-col gap-3">
+                      {(recipe.servings != null ||
+                        totalMinutes(recipe) != null) && (
+                        <div className="flex gap-4 text-sm text-muted-foreground">
+                          {recipe.servings != null && (
+                            <span>{recipe.servings} servings</span>
+                          )}
+                          {totalMinutes(recipe) != null && (
+                            <span>{totalMinutes(recipe)} min</span>
+                          )}
+                        </div>
+                      )}
+                      {qualifying.length > 0 && (
+                        <div className="flex flex-wrap gap-2">
+                          {qualifying.map((propertyScore) => (
+                            <span
+                              key={propertyScore.id}
+                              title={
+                                propertyScore.property.description ??
+                                undefined
+                              }
+                              className="rounded-full bg-muted px-2.5 py-0.5 text-xs font-medium text-muted-foreground"
+                            >
+                              {propertyScore.property.label}
+                            </span>
+                          ))}
+                        </div>
+                      )}
+                    </CardContent>
                   )}
-                </CardHeader>
-                {(recipe.servings != null || totalMinutes(recipe) != null) && (
-                  <CardContent>
-                    <div className="flex gap-4 text-sm text-muted-foreground">
-                      {recipe.servings != null && (
-                        <span>{recipe.servings} servings</span>
-                      )}
-                      {totalMinutes(recipe) != null && (
-                        <span>{totalMinutes(recipe)} min</span>
-                      )}
-                    </div>
-                  </CardContent>
-                )}
-              </Card>
-            </Link>
-          ))}
+                </Card>
+              </Link>
+            );
+          })}
         </div>
       </main>
     </div>

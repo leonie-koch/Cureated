@@ -1,22 +1,38 @@
 import 'dotenv/config';
-import { PrismaPg } from '@prisma/adapter-pg';
-import { PrismaClient } from '@prisma/client';
+import { NestFactory } from '@nestjs/core';
+import { AppModule } from '../src/app.module.js';
+import { PrismaService } from '../src/prisma/prisma.service.js';
+import { PropertiesService } from '../src/properties/properties.service.js';
+import {
+  ATOMIC_PROPERTY_DEFINITIONS,
+  PROTEIN_RICH_PROPERTY,
+} from '../src/recipes/atomic-properties.js';
+import { CreateRecipeDto } from '../src/recipes/dto/create-recipe.dto.js';
+import { RecipesService } from '../src/recipes/recipes.service.js';
 
-const prisma = new PrismaClient({
-  adapter: new PrismaPg({ connectionString: process.env.DATABASE_URL }),
-});
+// Atomic properties only — directly data-based, 1:1 with a measurable
+// value, no disease-specific claim attached (see README "Core features").
+// Composite properties (e.g. "Mitochondrial support") and condition
+// weighting build on these but rest on much more contested science for
+// the prototype's initial condition (ME/CFS); left unseeded for now so the
+// app doesn't surface them until that's been thought through further.
+// Derived from the single source of truth in atomic-properties.ts, rather
+// than duplicating key/label/description here, so scoring and the seeded
+// catalog can't drift apart.
+const ATOMIC_PROPERTIES = [
+  ...ATOMIC_PROPERTY_DEFINITIONS.map(({ key, label, description }) => ({
+    key,
+    label,
+    description,
+  })),
+  {
+    key: PROTEIN_RICH_PROPERTY.key,
+    label: PROTEIN_RICH_PROPERTY.label,
+    description: PROTEIN_RICH_PROPERTY.description,
+  },
+];
 
-type SeedIngredient = { blsFoodCode: string; amount: number; unit: string };
-
-const recipes: {
-  title: string;
-  description: string;
-  servings: number;
-  prepMinutes: number;
-  cookMinutes: number;
-  instructions: string;
-  ingredients: SeedIngredient[];
-}[] = [
+const RECIPES: CreateRecipeDto[] = [
   {
     title: 'Lemon Garlic Roasted Salmon',
     description: 'Flaky salmon fillets roasted with lemon, garlic and herbs.',
@@ -77,75 +93,67 @@ const recipes: {
   },
 ];
 
-// Mirrors RecipesService.resolveIngredientIdByBlsFoodCode: matches an
-// existing Ingredient by blsFoodCode first, then retroactively by name
-// (in case it was added as free text before this seed ran), and only
-// creates a new row as a last resort — so re-running against a database
-// that already has some of these ingredients doesn't create duplicates.
-async function resolveIngredientId(blsFoodCode: string): Promise<string> {
-  const alreadyMatched = await prisma.ingredient.findFirst({
-    where: { blsFoodCode },
-    select: { id: true },
-  });
-  if (alreadyMatched) {
-    return alreadyMatched.id;
-  }
-
-  const blsFood = await prisma.blsFood.findUniqueOrThrow({
-    where: { blsCode: blsFoodCode },
-    select: { nameDe: true },
-  });
-
-  const existingByName = await prisma.ingredient.findFirst({
-    where: { name: { equals: blsFood.nameDe, mode: 'insensitive' } },
-    select: { id: true },
-  });
-  if (existingByName) {
-    const updated = await prisma.ingredient.update({
-      where: { id: existingByName.id },
-      data: { blsFoodCode },
+async function seedProperties(
+  prisma: PrismaService,
+  propertiesService: PropertiesService,
+) {
+  let created = 0;
+  for (const property of ATOMIC_PROPERTIES) {
+    const existing = await prisma.property.findUnique({
+      where: { key: property.key },
       select: { id: true },
     });
-    return updated.id;
+    if (existing) {
+      continue;
+    }
+    await propertiesService.create(property);
+    created++;
   }
-
-  const created = await prisma.ingredient.create({
-    data: { name: blsFood.nameDe, blsFoodCode },
-    select: { id: true },
-  });
-  return created.id;
+  console.log(
+    created > 0
+      ? `Seeded ${created} propert${created === 1 ? 'y' : 'ies'}.`
+      : 'Skipping property seed: all atomic properties already exist.',
+  );
 }
 
-async function main() {
+// Goes through RecipesService.create (rather than a plain Prisma insert)
+// so seeded recipes get the same ingredient resolution and property score
+// computation any recipe created through the API gets — this only pays off
+// if properties already exist when a recipe is created, hence seeding
+// those first.
+async function seedRecipes(
+  prisma: PrismaService,
+  recipesService: RecipesService,
+) {
   const existingCount = await prisma.recipe.count();
   if (existingCount > 0) {
     console.log(
-      `Skipping seed: ${existingCount} recipe(s) already exist in the database.`,
+      `Skipping recipe seed: ${existingCount} recipe(s) already exist in the database.`,
     );
     return;
   }
 
-  for (const { ingredients, ...recipeFields } of recipes) {
-    const recipe = await prisma.recipe.create({ data: recipeFields });
-
-    await prisma.recipeIngredient.createMany({
-      data: await Promise.all(
-        ingredients.map(async (ingredient) => ({
-          recipeId: recipe.id,
-          ingredientId: await resolveIngredientId(ingredient.blsFoodCode),
-          amount: ingredient.amount,
-          unit: ingredient.unit,
-        })),
-      ),
-    });
+  for (const recipe of RECIPES) {
+    await recipesService.create(recipe);
   }
-
-  console.log(`Seeded ${recipes.length} recipes with ingredients.`);
+  console.log(`Seeded ${RECIPES.length} recipes with ingredients.`);
 }
 
-main()
-  .catch((error) => {
-    console.error(error);
-    process.exit(1);
-  })
-  .finally(() => prisma.$disconnect());
+async function main() {
+  const app = await NestFactory.createApplicationContext(AppModule, {
+    logger: false,
+  });
+
+  try {
+    const prisma = app.get(PrismaService);
+    await seedProperties(prisma, app.get(PropertiesService));
+    await seedRecipes(prisma, app.get(RecipesService));
+  } finally {
+    await app.close();
+  }
+}
+
+main().catch((error) => {
+  console.error(error);
+  process.exit(1);
+});

@@ -9,7 +9,6 @@ type PrivateMethods = {
 describe('RecipesService nutrient math', () => {
   const service = new RecipesService(
     undefined as never,
-    undefined as never,
   ) as unknown as PrivateMethods;
 
   describe('toGrams', () => {

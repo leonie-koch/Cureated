@@ -8,6 +8,7 @@ import {
   CardTitle,
 } from "@/components/ui/card";
 import { API_URL } from "@/lib/api";
+import { PropertyScore, qualifyingPropertyScores } from "@/lib/property-scores";
 
 type RecipeDetail = {
   id: string;
@@ -26,16 +27,7 @@ type RecipeDetail = {
       name: string;
     };
   }[];
-  propertyScores: {
-    id: string;
-    score: number;
-    property: {
-      id: string;
-      key: string;
-      label: string;
-      description: string | null;
-    };
-  }[];
+  propertyScores: PropertyScore[];
 };
 
 type Micronutrient = {
@@ -137,6 +129,8 @@ export default async function RecipePage({
     notFound();
   }
 
+  const qualifyingScores = qualifyingPropertyScores(recipe.propertyScores);
+
   return (
     <div className="min-h-screen bg-background px-6 py-12 sm:px-12">
       <main className="mx-auto flex w-full max-w-2xl flex-col gap-8">
@@ -167,16 +161,15 @@ export default async function RecipePage({
           )}
         </div>
 
-        {recipe.propertyScores.length > 0 && (
+        {qualifyingScores.length > 0 && (
           <div className="flex flex-wrap gap-2">
-            {recipe.propertyScores.map((propertyScore) => (
+            {qualifyingScores.map((propertyScore) => (
               <span
                 key={propertyScore.id}
                 title={propertyScore.property.description ?? undefined}
                 className="rounded-full bg-muted px-3 py-1 text-xs font-medium text-muted-foreground"
               >
-                {propertyScore.property.label}{" "}
-                {Math.round(propertyScore.score * 100)}%
+                {propertyScore.property.label}
               </span>
             ))}
           </div>
