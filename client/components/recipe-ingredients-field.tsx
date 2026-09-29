@@ -13,6 +13,7 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { cn } from "@/lib/utils";
+import { API_URL } from "@/lib/api";
 
 export const INGREDIENT_UNITS = [
   "g",
@@ -26,8 +27,6 @@ export const INGREDIENT_UNITS = [
   "oz",
   "lb",
 ] as const;
-
-const API_URL = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:3333";
 
 type BlsFoodOption = {
   blsCode: string;
