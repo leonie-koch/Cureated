@@ -75,26 +75,28 @@ export default async function Home() {
 
         <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
           {recipes.map((recipe) => (
-            <Card key={recipe.id}>
-              <CardHeader>
-                <CardTitle>{recipe.title}</CardTitle>
-                {recipe.description && (
-                  <CardDescription>{recipe.description}</CardDescription>
+            <Link key={recipe.id} href={`/recipes/${recipe.id}`}>
+              <Card className="transition-shadow hover:shadow-md">
+                <CardHeader>
+                  <CardTitle>{recipe.title}</CardTitle>
+                  {recipe.description && (
+                    <CardDescription>{recipe.description}</CardDescription>
+                  )}
+                </CardHeader>
+                {(recipe.servings != null || totalMinutes(recipe) != null) && (
+                  <CardContent>
+                    <div className="flex gap-4 text-sm text-muted-foreground">
+                      {recipe.servings != null && (
+                        <span>{recipe.servings} servings</span>
+                      )}
+                      {totalMinutes(recipe) != null && (
+                        <span>{totalMinutes(recipe)} min</span>
+                      )}
+                    </div>
+                  </CardContent>
                 )}
-              </CardHeader>
-              {(recipe.servings != null || totalMinutes(recipe) != null) && (
-                <CardContent>
-                  <div className="flex gap-4 text-sm text-muted-foreground">
-                    {recipe.servings != null && (
-                      <span>{recipe.servings} servings</span>
-                    )}
-                    {totalMinutes(recipe) != null && (
-                      <span>{totalMinutes(recipe)} min</span>
-                    )}
-                  </div>
-                </CardContent>
-              )}
-            </Card>
+              </Card>
+            </Link>
           ))}
         </div>
       </main>
