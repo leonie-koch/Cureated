@@ -25,6 +25,28 @@ const RECIPE_INCLUDE = {
   },
 } satisfies Prisma.RecipeInclude;
 
+// BLS 4.0 nutrient component groups that make up "micronutrients" (vitamins
+// and minerals), as opposed to macronutrients, amino/fatty acids, energy,
+// etc. — see the `group` values on BlsNutrientComponent. Order here is the
+// display order on the recipe detail page.
+const MICRONUTRIENT_GROUPS = [
+  'Fettlösliche Vitamine',
+  'Wasserlösliche Vitamine',
+  'Elemente',
+] as const;
+
+export type RecipeMicronutrient = {
+  code: string;
+  nameDe: string;
+  nameEn: string | null;
+  unit: string;
+  group: string;
+  // Total amount in this recipe, summed across all matched ingredients by
+  // their amount. Null when none of the recipe's BLS-matched ingredients
+  // have a value for this nutrient (not the same as a confirmed zero).
+  amount: number | null;
+};
+
 @Injectable()
 export class RecipesService {
   constructor(
@@ -89,6 +111,106 @@ export class RecipesService {
     }
 
     return recipe;
+  }
+
+  /**
+   * Total micronutrient content of the whole recipe (not per 100g or per
+   * serving): each BLS-matched ingredient's per-100g value scaled by its
+   * amount in the recipe, summed across ingredients. Ingredients without a
+   * confirmed BLS match contribute nothing, same limitation as
+   * recomputePropertyScores. Returns every vitamin/mineral component BLS
+   * tracks (see MICRONUTRIENT_GROUPS), not just the ones this recipe has
+   * data for, so the caller can show "no data" rather than omit them.
+   */
+  async getMicronutrients(id: string): Promise<RecipeMicronutrient[]> {
+    const recipe = await this.prisma.recipe.findUnique({
+      where: { id },
+      select: {
+        recipeIngredients: {
+          select: {
+            amount: true,
+            unit: true,
+            ingredient: { select: { blsFoodCode: true } },
+          },
+        },
+      },
+    });
+
+    if (!recipe) {
+      throw new NotFoundException(`Recipe with id "${id}" not found`);
+    }
+
+    const gramsByFoodCode = new Map<string, number>();
+    for (const item of recipe.recipeIngredients) {
+      const blsFoodCode = item.ingredient.blsFoodCode;
+      if (!blsFoodCode) {
+        continue;
+      }
+      const grams = this.toGrams(item.amount, item.unit);
+      if (!Number.isFinite(grams) || grams <= 0) {
+        continue;
+      }
+      gramsByFoodCode.set(
+        blsFoodCode,
+        (gramsByFoodCode.get(blsFoodCode) ?? 0) + grams,
+      );
+    }
+
+    const components = await this.prisma.blsNutrientComponent.findMany({
+      where: { group: { in: [...MICRONUTRIENT_GROUPS] } },
+      select: {
+        code: true,
+        nameDe: true,
+        nameEn: true,
+        unit: true,
+        group: true,
+      },
+    });
+
+    const amountByCode = new Map<string, number>();
+    if (gramsByFoodCode.size > 0) {
+      const rows = await this.prisma.blsFoodNutrient.findMany({
+        where: {
+          foodCode: { in: Array.from(gramsByFoodCode.keys()) },
+          componentCode: { in: components.map((c) => c.code) },
+          value: { not: null },
+        },
+        select: { foodCode: true, componentCode: true, value: true },
+      });
+
+      for (const row of rows) {
+        const grams = gramsByFoodCode.get(row.foodCode) ?? 0;
+        const contribution = (grams / 100) * row.value!;
+        amountByCode.set(
+          row.componentCode,
+          (amountByCode.get(row.componentCode) ?? 0) + contribution,
+        );
+      }
+    }
+
+    const groupOrder = new Map<string, number>(
+      MICRONUTRIENT_GROUPS.map((group, index) => [group, index]),
+    );
+
+    return components
+      .map((component) => {
+        const amount = amountByCode.get(component.code);
+        return {
+          code: component.code,
+          nameDe: component.nameDe,
+          nameEn: component.nameEn,
+          unit: component.unit,
+          group: component.group!,
+          // Rounded to avoid floating-point noise from summing per-100g
+          // values across ingredients (e.g. 1.6099999999999999).
+          amount: amount != null ? Math.round(amount * 1000) / 1000 : null,
+        };
+      })
+      .sort((a, b) => {
+        const groupDiff =
+          (groupOrder.get(a.group) ?? 0) - (groupOrder.get(b.group) ?? 0);
+        return groupDiff !== 0 ? groupDiff : a.nameDe.localeCompare(b.nameDe);
+      });
   }
 
   async update(id: string, dto: UpdateRecipeDto) {

@@ -38,6 +38,15 @@ type RecipeDetail = {
   }[];
 };
 
+type Micronutrient = {
+  code: string;
+  nameDe: string;
+  nameEn: string | null;
+  unit: string;
+  group: string;
+  amount: number | null;
+};
+
 async function getRecipe(id: string): Promise<RecipeDetail | null> {
   const res = await fetch(`${API_URL}/recipes/${id}`, { cache: "no-store" });
 
@@ -50,6 +59,33 @@ async function getRecipe(id: string): Promise<RecipeDetail | null> {
   }
 
   return res.json();
+}
+
+async function getMicronutrients(id: string): Promise<Micronutrient[]> {
+  const res = await fetch(`${API_URL}/recipes/${id}/micronutrients`, {
+    cache: "no-store",
+  });
+
+  if (!res.ok) {
+    throw new Error(`Failed to load micronutrients: ${res.status}`);
+  }
+
+  return res.json();
+}
+
+// Preserves the backend's group order (fat-soluble vitamins, water-soluble
+// vitamins, elements) instead of re-sorting, since Map iteration order
+// follows insertion order.
+function groupMicronutrients(
+  micronutrients: Micronutrient[],
+): { group: string; items: Micronutrient[] }[] {
+  const byGroup = new Map<string, Micronutrient[]>();
+  for (const nutrient of micronutrients) {
+    const items = byGroup.get(nutrient.group) ?? [];
+    items.push(nutrient);
+    byGroup.set(nutrient.group, items);
+  }
+  return Array.from(byGroup, ([group, items]) => ({ group, items }));
 }
 
 function totalMinutes(recipe: RecipeDetail): number | null {
@@ -67,10 +103,14 @@ export default async function RecipePage({
   const { id } = await params;
 
   let recipe: RecipeDetail | null = null;
+  let micronutrients: Micronutrient[] = [];
   let loadError: string | null = null;
 
   try {
     recipe = await getRecipe(id);
+    if (recipe) {
+      micronutrients = await getMicronutrients(id);
+    }
   } catch {
     loadError =
       "Couldn't reach the API. Make sure the server is running on " +
@@ -180,6 +220,47 @@ export default async function RecipePage({
             </CardContent>
           )}
         </Card>
+
+        {micronutrients.length > 0 && (
+          <details className="group rounded-xl bg-card p-4 text-card-foreground ring-1 ring-foreground/10">
+            <summary className="flex cursor-pointer list-none items-center justify-between font-heading text-base font-medium marker:hidden">
+              Micronutrients
+              <span className="text-muted-foreground transition-transform group-open:rotate-180">
+                ⌄
+              </span>
+            </summary>
+            <p className="mt-1 text-xs text-muted-foreground">
+              Total amounts for this recipe, not per serving. Ingredients not
+              matched to a BLS food don&apos;t contribute any data.
+            </p>
+            <div className="mt-4 flex flex-col gap-4">
+              {groupMicronutrients(micronutrients).map(({ group, items }) => (
+                <div key={group}>
+                  <h3 className="mb-2 text-sm font-medium text-foreground">
+                    {group}
+                  </h3>
+                  <ul className="grid grid-cols-1 gap-x-4 gap-y-1 text-sm sm:grid-cols-2">
+                    {items.map((nutrient) => (
+                      <li
+                        key={nutrient.code}
+                        className="flex justify-between gap-2"
+                      >
+                        <span className="text-muted-foreground">
+                          {nutrient.nameDe}
+                        </span>
+                        <span>
+                          {nutrient.amount != null
+                            ? `${nutrient.amount} ${nutrient.unit}`
+                            : "–"}
+                        </span>
+                      </li>
+                    ))}
+                  </ul>
+                </div>
+              ))}
+            </div>
+          </details>
+        )}
       </main>
     </div>
   );
