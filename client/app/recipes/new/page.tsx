@@ -13,8 +13,7 @@ import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { RecipeIngredientsField } from "@/components/recipe-ingredients-field";
 import { cn } from "@/lib/utils";
-
-const API_URL = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:3333";
+import { API_URL } from "@/lib/api";
 
 function numberOrUndefined(value: FormDataEntryValue | null) {
   if (!value || value === "") return undefined;

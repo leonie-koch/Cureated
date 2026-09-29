@@ -30,6 +30,11 @@ export class RecipesController {
     return this.recipesService.findOne(id);
   }
 
+  @Get(':id/micronutrients')
+  getMicronutrients(@Param('id') id: string) {
+    return this.recipesService.getMicronutrients(id);
+  }
+
   @Patch(':id')
   update(@Param('id') id: string, @Body() updateRecipeDto: UpdateRecipeDto) {
     return this.recipesService.update(id, updateRecipeDto);

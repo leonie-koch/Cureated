@@ -4,8 +4,11 @@ import {
   NotFoundException,
 } from '@nestjs/common';
 import { Prisma } from '@prisma/client';
-import { IngredientsService } from '../ingredients/ingredients.service.js';
 import { PrismaService } from '../prisma/prisma.service.js';
+import {
+  ATOMIC_PROPERTY_DEFINITIONS,
+  PROTEIN_RICH_PROPERTY,
+} from './atomic-properties.js';
 import {
   CreateRecipeDto,
   RecipeIngredientInputDto,
@@ -25,12 +28,31 @@ const RECIPE_INCLUDE = {
   },
 } satisfies Prisma.RecipeInclude;
 
+// BLS 4.0 nutrient component groups that make up "micronutrients" (vitamins
+// and minerals), as opposed to macronutrients, amino/fatty acids, energy,
+// etc. — see the `group` values on BlsNutrientComponent. Order here is the
+// display order on the recipe detail page.
+const MICRONUTRIENT_GROUPS = [
+  'Fettlösliche Vitamine',
+  'Wasserlösliche Vitamine',
+  'Elemente',
+] as const;
+
+export type RecipeMicronutrient = {
+  code: string;
+  nameDe: string;
+  nameEn: string | null;
+  unit: string;
+  group: string;
+  // Total amount in this recipe, summed across all matched ingredients by
+  // their amount. Null when none of the recipe's BLS-matched ingredients
+  // have a value for this nutrient (not the same as a confirmed zero).
+  amount: number | null;
+};
+
 @Injectable()
 export class RecipesService {
-  constructor(
-    private readonly prisma: PrismaService,
-    private readonly ingredientsService: IngredientsService,
-  ) {}
+  constructor(private readonly prisma: PrismaService) {}
 
   async create(dto: CreateRecipeDto) {
     try {
@@ -89,6 +111,106 @@ export class RecipesService {
     }
 
     return recipe;
+  }
+
+  /**
+   * Total micronutrient content of the whole recipe (not per 100g or per
+   * serving): each BLS-matched ingredient's per-100g value scaled by its
+   * amount in the recipe, summed across ingredients. Ingredients without a
+   * confirmed BLS match contribute nothing, same limitation as
+   * recomputePropertyScores. Returns every vitamin/mineral component BLS
+   * tracks (see MICRONUTRIENT_GROUPS), not just the ones this recipe has
+   * data for, so the caller can show "no data" rather than omit them.
+   */
+  async getMicronutrients(id: string): Promise<RecipeMicronutrient[]> {
+    const recipe = await this.prisma.recipe.findUnique({
+      where: { id },
+      select: {
+        recipeIngredients: {
+          select: {
+            amount: true,
+            unit: true,
+            ingredient: { select: { blsFoodCode: true } },
+          },
+        },
+      },
+    });
+
+    if (!recipe) {
+      throw new NotFoundException(`Recipe with id "${id}" not found`);
+    }
+
+    const gramsByFoodCode = new Map<string, number>();
+    for (const item of recipe.recipeIngredients) {
+      const blsFoodCode = item.ingredient.blsFoodCode;
+      if (!blsFoodCode) {
+        continue;
+      }
+      const grams = this.toGrams(item.amount, item.unit);
+      if (!Number.isFinite(grams) || grams <= 0) {
+        continue;
+      }
+      gramsByFoodCode.set(
+        blsFoodCode,
+        (gramsByFoodCode.get(blsFoodCode) ?? 0) + grams,
+      );
+    }
+
+    const components = await this.prisma.blsNutrientComponent.findMany({
+      where: { group: { in: [...MICRONUTRIENT_GROUPS] } },
+      select: {
+        code: true,
+        nameDe: true,
+        nameEn: true,
+        unit: true,
+        group: true,
+      },
+    });
+
+    const amountByCode = new Map<string, number>();
+    if (gramsByFoodCode.size > 0) {
+      const rows = await this.prisma.blsFoodNutrient.findMany({
+        where: {
+          foodCode: { in: Array.from(gramsByFoodCode.keys()) },
+          componentCode: { in: components.map((c) => c.code) },
+          value: { not: null },
+        },
+        select: { foodCode: true, componentCode: true, value: true },
+      });
+
+      for (const row of rows) {
+        const grams = gramsByFoodCode.get(row.foodCode) ?? 0;
+        const contribution = (grams / 100) * row.value!;
+        amountByCode.set(
+          row.componentCode,
+          (amountByCode.get(row.componentCode) ?? 0) + contribution,
+        );
+      }
+    }
+
+    const groupOrder = new Map<string, number>(
+      MICRONUTRIENT_GROUPS.map((group, index) => [group, index]),
+    );
+
+    return components
+      .map((component) => {
+        const amount = amountByCode.get(component.code);
+        return {
+          code: component.code,
+          nameDe: component.nameDe,
+          nameEn: component.nameEn,
+          unit: component.unit,
+          group: component.group!,
+          // Rounded to avoid floating-point noise from summing per-100g
+          // values across ingredients (e.g. 1.6099999999999999).
+          amount: amount != null ? Math.round(amount * 1000) / 1000 : null,
+        };
+      })
+      .sort((a, b) => {
+        const groupDiff =
+          (groupOrder.get(a.group) ?? 0) - (groupOrder.get(b.group) ?? 0);
+        return groupDiff !== 0 ? groupDiff : a.nameDe.localeCompare(b.nameDe);
+      });
   }
 
   async update(id: string, dto: UpdateRecipeDto) {
@@ -255,6 +377,15 @@ export class RecipesService {
     return created.id;
   }
 
+  /**
+   * Scores the recipe against every ATOMIC_PROPERTY_DEFINITIONS entry, plus
+   * the protein-energy-ratio-based PROTEIN_RICH_PROPERTY and the
+   * (still-unseeded, see prisma/seed.ts) "mitochondrien_support" composite.
+   * Only ingredients with a confirmed BLS match contribute nutrient data —
+   * an unmatched ingredient's mass still counts toward the recipe's total
+   * (diluting concentration-based thresholds), but contributes 0 to every
+   * nutrient, same limitation as RecipesService.getMicronutrients.
+   */
   private async recomputePropertyScores(
     tx: Prisma.TransactionClient,
     recipeId: string,
@@ -268,7 +399,6 @@ export class RecipesService {
             unit: true,
             ingredient: {
               select: {
-                name: true,
                 blsFoodCode: true,
               },
             },
@@ -282,41 +412,92 @@ export class RecipesService {
     }
 
     let totalMassG = 0;
-    let totalSugarG = 0;
-    let totalMagnesiumMg = 0;
-    let totalVitaminB12Ug = 0;
+    const gramsByFoodCode = new Map<string, number>();
 
     for (const item of recipe.recipeIngredients) {
-      const nutrients =
-        await this.ingredientsService.resolveNutrientsForIngredient(
-          item.ingredient,
-        );
       const grams = this.toGrams(item.amount, item.unit);
       if (!Number.isFinite(grams) || grams <= 0) {
         continue;
       }
 
       totalMassG += grams;
-      totalSugarG += grams * ((nutrients.sugarPer100g ?? 0) / 100);
-      totalMagnesiumMg += grams * ((nutrients.magnesiumPer100gMg ?? 0) / 100);
-      totalVitaminB12Ug += grams * ((nutrients.vitaminB12Per100g ?? 0) / 100);
+      if (item.ingredient.blsFoodCode) {
+        gramsByFoodCode.set(
+          item.ingredient.blsFoodCode,
+          (gramsByFoodCode.get(item.ingredient.blsFoodCode) ?? 0) + grams,
+        );
+      }
     }
 
-    const sugarPer100g = totalMassG > 0 ? (totalSugarG / totalMassG) * 100 : 0;
-    const magnesiumPer100g =
-      totalMassG > 0 ? (totalMagnesiumMg / totalMassG) * 100 : 0;
-    const vitaminB12Per100g =
-      totalMassG > 0 ? (totalVitaminB12Ug / totalMassG) * 100 : 0;
+    const allCodes = Array.from(
+      new Set([
+        ...ATOMIC_PROPERTY_DEFINITIONS.flatMap((def) => def.codes),
+        'PROT625',
+      ]),
+    );
 
-    const magnesiumScore = this.normalize(magnesiumPer100g, 20, 80);
-    const b12Score = this.normalize(vitaminB12Per100g, 0.2, 1.0);
+    const totalByCode = new Map<string, number>();
+    if (gramsByFoodCode.size > 0) {
+      const rows = await tx.blsFoodNutrient.findMany({
+        where: {
+          foodCode: { in: Array.from(gramsByFoodCode.keys()) },
+          componentCode: { in: allCodes },
+          value: { not: null },
+        },
+        select: { foodCode: true, componentCode: true, value: true },
+      });
 
-    const scoreByKey = new Map<string, number>([
-      ['zuckerarm', this.inverseNormalize(sugarPer100g, 5, 15)],
-      ['magnesiumreich', magnesiumScore],
-      ['vitamin_b12_reich', b12Score],
-      ['mitochondrien_support', Math.min(magnesiumScore, b12Score)],
-    ]);
+      for (const row of rows) {
+        const grams = gramsByFoodCode.get(row.foodCode) ?? 0;
+        const contribution = (grams / 100) * row.value!;
+        totalByCode.set(
+          row.componentCode,
+          (totalByCode.get(row.componentCode) ?? 0) + contribution,
+        );
+      }
+    }
+
+    // Concentration (per 100g of the whole recipe) of the given nutrient
+    // code(s) summed together — the unit every threshold above is defined
+    // in.
+    const per100g = (codes: string[]): number => {
+      if (totalMassG <= 0) {
+        return 0;
+      }
+      const total = codes.reduce(
+        (sum, code) => sum + (totalByCode.get(code) ?? 0),
+        0,
+      );
+      return (total / totalMassG) * 100;
+    };
+
+    const scoreByKey = new Map<string, number>();
+    for (const def of ATOMIC_PROPERTY_DEFINITIONS) {
+      const value = per100g(def.codes);
+      scoreByKey.set(
+        def.key,
+        def.direction === 'low'
+          ? this.inverseNormalize(value, def.min, def.max)
+          : this.normalize(value, def.min, def.max),
+      );
+    }
+
+    const proteinPer100g = per100g(['PROT625']);
+    const kcalPer100g = per100g(['ENERCC']);
+    const proteinEnergyRatioPercent =
+      kcalPer100g > 0 ? ((proteinPer100g * 4) / kcalPer100g) * 100 : 0;
+    scoreByKey.set(
+      PROTEIN_RICH_PROPERTY.key,
+      this.normalize(
+        proteinEnergyRatioPercent,
+        PROTEIN_RICH_PROPERTY.min,
+        PROTEIN_RICH_PROPERTY.max,
+      ),
+    );
+
+    const magnesiumScore = scoreByKey.get('magnesiumreich') ?? 0;
+    const b12Score = scoreByKey.get('vitamin_b12_reich') ?? 0;
+    scoreByKey.set('mitochondrien_support', Math.min(magnesiumScore, b12Score));
 
     const properties = await tx.property.findMany({
       where: {

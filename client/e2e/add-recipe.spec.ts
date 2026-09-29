@@ -1,6 +1,5 @@
 import { test, expect } from "@playwright/test";
-
-const API_URL = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:3333";
+import { API_URL } from "@/lib/api";
 
 test("adds a recipe via the create-recipe form and shows it in the homefeed", async ({
   page,
